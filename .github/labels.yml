@@ -1,0 +1,122 @@
+# ==============================================================================
+# Label configuration file
+# Sync this file across repositories using github-label-sync or GitHub Actions
+# Includes semantic-release mappings
+# ==============================================================================
+
+# -----------------------------
+# Dependency & Automation
+# -----------------------------
+- name: dependencies
+  color: "0366d6"
+  description: "Updates to project dependencies"
+- name: github-actions
+  color: "6f42c1"
+  description: "GitHub Actions and CI workflow updates"
+- name: ci
+  color: "0e8a16"
+  description: "Continuous integration or testing improvements"
+- name: release
+  color: "5319e7"
+  description: "Release automation and changelog updates"
+- name: docker
+  color: "2496ED"
+  description: "Docker and containerization changes"
+
+# -----------------------------
+# Code & Architecture
+# -----------------------------
+- name: bug
+  color: "d73a4a"
+  description: "Something isn’t working"
+- name: enhancement
+  color: "84b6eb"
+  description: "New feature or improvement"
+- name: refactor
+  color: "fbca04"
+  description: "Code reorganization without behavior change"
+- name: documentation
+  color: "0075ca"
+  description: "Documentation updates"
+- name: tests
+  color: "1d76db"
+  description: "Unit tests or CI coverage improvements"
+- name: security
+  color: "b60205"
+  description: "Security-related changes or patches"
+
+# -----------------------------
+# Project Management
+# -----------------------------
+- name: good first issue
+  color: "7057ff"
+  description: "Good starting point for new contributors"
+- name: help wanted
+  color: "008672"
+  description: "Contributions welcome"
+- name: wontfix
+  color: "ffffff"
+  description: "This issue will not be fixed"
+- name: duplicate
+  color: "cfd3d7"
+  description: "Duplicate of another issue"
+- name: invalid
+  color: "e4e669"
+  description: "This issue is not valid"
+
+# -----------------------------
+# Domain-Specific (Data Science / ML)
+# -----------------------------
+- name: data
+  color: "f1e05a"
+  description: "Dataset or schema-related changes"
+- name: model
+  color: "a2eeef"
+  description: "Model architecture or training updates"
+- name: pipeline
+  color: "0b8043"
+  description: "Data pipeline, ETL, or Flink integration"
+- name: analysis
+  color: "d4c5f9"
+  description: "Exploratory data analysis or research"
+- name: notebook
+  color: "f9d0c4"
+  description: "Notebook or experiment changes"
+
+# -----------------------------
+# Maintenance & Meta
+# -----------------------------
+- name: cleanup
+  color: "bfdadc"
+  description: "Removing obsolete code or assets"
+- name: chore
+  color: "cccccc"
+  description: "Non-functional maintenance or housekeeping"
+- name: infra
+  color: "2b67c6"
+  description: "Infrastructure or DevOps updates"
+- name: performance
+  color: "fef2c0"
+  description: "Performance improvements"
+
+# -----------------------------
+# Semantic & Automation Labels
+# -----------------------------
+- name: feature
+  color: "0e8a16"
+  description: "Semantic-release: minor version bump"
+  release-type: minor
+- name: fix
+  color: "d73a4a"
+  description: "Semantic-release: patch version bump"
+  release-type: patch
+- name: breaking change
+  color: "b60205"
+  description: "Semantic-release: major version bump"
+  release-type: major
+- name: todo
+  color: "d4c5f9"
+  description: "Automatically generated TODO issue"
+- name: agent
+  color: "ffb300"
+  description: "LLM-generated or automated PR"

@@ -141,3 +141,8 @@ results/
 experiments/
 *.csv
 *.json
+
+# Ignore node semantic-release artifacts
+node_modules/
+.npm/
+npm-debug.log*

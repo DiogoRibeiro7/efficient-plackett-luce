@@ -1,0 +1,32 @@
+branches:
+  - main
+  - name: develop
+    prerelease: true
+
+plugins:
+  # Analyze commit messages or PR labels to determine release type
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+
+  # Generate and update the changelog
+  - "@semantic-release/changelog"
+  
+  # Commit version bump and changelog to the repo
+  - "@semantic-release/git"
+  
+  # Create GitHub release with notes and tag
+  - "@semantic-release/github"
+
+preset: "conventionalcommits"
+
+# Optional customization (less strict parsing)
+tagFormat: "v${version}"
+
+# Only include specific labels for release analysis
+releaseRules:
+  - label: "breaking change"
+    release: major
+  - label: "feature"
+    release: minor
+  - label: "fix"
+    release: patch

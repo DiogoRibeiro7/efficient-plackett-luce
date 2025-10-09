@@ -8,6 +8,7 @@ with the full multi-body model.
 from typing import Dict, List, Tuple
 
 from .core import PlackettLuceModel
+from .utils import Hyperedge, normalize_hyperedges
 
 
 class ProjectedPlackettLuce(PlackettLuceModel):
@@ -16,7 +17,7 @@ class ProjectedPlackettLuce(PlackettLuceModel):
     to pairwise comparisons (Eq. 16 and 17 from paper).
     """
 
-    def _project_to_pairwise(self, hyperedges: List[Tuple]) -> List[Tuple]:
+    def _project_to_pairwise(self, hyperedges: List[Hyperedge]) -> List[Hyperedge]:
         """
         Project multi-body comparisons to pairwise comparisons.
 
@@ -40,5 +41,6 @@ class ProjectedPlackettLuce(PlackettLuceModel):
 
     def fit(self, hyperedges: List[Tuple], verbose: bool = False) -> Dict:
         """Fit model on projected pairwise comparisons."""
-        pairwise = self._project_to_pairwise(hyperedges)
+        normalized = normalize_hyperedges(hyperedges)
+        pairwise = self._project_to_pairwise(normalized)
         return super().fit(pairwise, verbose)

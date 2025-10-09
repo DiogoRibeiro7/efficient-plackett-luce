@@ -11,7 +11,7 @@ import time
 import warnings
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 
@@ -23,6 +23,18 @@ from .optimization import (
     newman_iteration_position1,
     normalize_scores,
 )
+from .utils import Hyperedge, normalize_hyperedges
+
+CacheDict = Dict[str, float]
+NodeIndexMap = Dict[Any, int]
+IndexNodeMap = Dict[int, Any]
+
+
+def _safe_sort_key(value: Any) -> Tuple[str, str]:
+    """Provide a deterministic sort key for heterogeneous node labels."""
+
+    return (type(value).__name__, repr(value))
+
 
 
 class PlackettLuceModel:
@@ -47,6 +59,7 @@ class PlackettLuceModel:
         max_iterations: int = 10000,
         use_cache: bool = True,
         timeout: Optional[float] = None,
+        random_state: Optional[int] = None,
     ):
         """
         Initialize the Plackett-Luce model.
@@ -71,41 +84,18 @@ class PlackettLuceModel:
         self.epsilon = epsilon
         self.max_iterations = max_iterations
         self.timeout = timeout
-        self.scores = None
-        self.node_to_idx = None
-        self.idx_to_node = None
+        self.scores: np.ndarray = np.empty(0, dtype=float)
+        self.node_to_idx: NodeIndexMap = {}
+        self.idx_to_node: IndexNodeMap = {}
         self.is_fitted = False
         self.use_cache = use_cache
-        self._data_hash_cache = {} if use_cache else None
+        self._data_hash_cache: Optional[CacheDict] = {} if use_cache else None
+        self.random_state = random_state
 
-    def _validate_hyperedges(self, hyperedges: List[Tuple]) -> None:
-        """Validate input hyperedges format."""
-        if not hyperedges:
-            raise ValueError("hyperedges cannot be empty")
+    def _validate_hyperedges(self, hyperedges: List[Tuple]) -> List[Hyperedge]:
+        """Normalize and validate hyperedges provided by the caller."""
 
-        for i, item in enumerate(hyperedges):
-            if not isinstance(item, tuple) or len(item) != 2:
-                raise ValueError(
-                    f"Each hyperedge must be (ranking, weight) tuple, got {item} at index {i}"
-                )
-
-            ranking, weight = item
-            if not isinstance(ranking, (tuple, list)) or len(ranking) < 2:
-                raise ValueError(
-                    f"Ranking must be tuple/list with at least 2 elements at index {i}"
-                )
-
-            if len(ranking) != len(set(ranking)):
-                duplicates = list(
-                    dict.fromkeys(node for node in ranking if ranking.count(node) > 1)
-                )
-                raise ValueError(
-                    f"Ranking contains duplicate nodes {duplicates} at index {i}. "
-                    f"Each entity can appear only once per ranking."
-                )
-
-            if not isinstance(weight, (int, float)) or weight <= 0:
-                raise ValueError(f"Weight must be positive number at index {i}")
+        return normalize_hyperedges(hyperedges)
 
     def _check_data_quality(self, hyperedges: List[Tuple]) -> None:
         """Check data quality and issue warnings for potential problems."""
@@ -151,36 +141,45 @@ class PlackettLuceModel:
 
     def _hash_hyperedges(self, hyperedges: List[Tuple]) -> str:
         """Create hash of hyperedges for caching."""
-        data_str = str(sorted(hyperedges))
+
+        normalized = normalize_hyperedges(hyperedges)
+        canonical = [
+            (
+                tuple(f"{type(node).__name__}:{repr(node)}" for node in ranking),
+                float(weight) if isinstance(weight, float) else weight,
+            )
+            for ranking, weight in normalized
+        ]
+        data_str = str(sorted(canonical))
         return hashlib.md5(data_str.encode()).hexdigest()
 
-    def _preprocess_edges(self, hyperedges: List[Tuple]):
+    def _preprocess_edges(self, hyperedges: List[Hyperedge]):
         """Convert hyperedges to efficient flattened array format."""
-        # Build node mapping
+
         unique_nodes = set()
-        for edge, _ in hyperedges:
-            unique_nodes.update(edge)
+        for ranking, _ in hyperedges:
+            unique_nodes.update(ranking)
 
-        self.node_to_idx = {node: idx for idx, node in enumerate(sorted(unique_nodes))}
+        sorted_nodes = sorted(unique_nodes, key=_safe_sort_key)
+        self.node_to_idx = {node: idx for idx, node in enumerate(sorted_nodes)}
         self.idx_to_node = {idx: node for node, idx in self.node_to_idx.items()}
-        N = len(unique_nodes)
+        N = len(sorted_nodes)
 
-        # Flatten edges into arrays
         M = len(hyperedges)
         weights = np.zeros(M, dtype=np.float64)
         edge_lengths = np.zeros(M, dtype=np.int32)
         edge_starts = np.zeros(M, dtype=np.int32)
 
-        total_elements = sum(len(edge) for edge, _ in hyperedges)
+        total_elements = sum(len(ranking) for ranking, _ in hyperedges)
         edges_flat = np.zeros(total_elements, dtype=np.int32)
 
         current_pos = 0
-        for i, (edge, weight) in enumerate(hyperedges):
-            edge_indices = [self.node_to_idx[node] for node in edge]
+        for i, (ranking, weight) in enumerate(hyperedges):
+            edge_indices = [self.node_to_idx[node] for node in ranking]
             K = len(edge_indices)
 
             edges_flat[current_pos : current_pos + K] = edge_indices
-            weights[i] = weight
+            weights[i] = float(weight)
             edge_lengths[i] = K
             edge_starts[i] = current_pos
             current_pos += K
@@ -202,16 +201,22 @@ class PlackettLuceModel:
         --------
         dict : Training statistics (iterations, time, final_convergence, converged, timed_out)
         """
-        if self.use_cache and self._data_hash_cache is not None:
-            self._data_hash_cache.clear()
-        self._validate_hyperedges(hyperedges)
-        self._check_data_quality(hyperedges)
+        if self.use_cache:
+            self._data_hash_cache = {}
+        else:
+            self._data_hash_cache = None
+
+        normalized_hyperedges = self._validate_hyperedges(hyperedges)
+        self._check_data_quality(normalized_hyperedges)
 
         # Preprocess data
-        N, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(hyperedges)
+        N, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(normalized_hyperedges)
+
+        rng_seed = self.random_state if self.random_state is not None else 42
+        rng = np.random.default_rng(rng_seed)
 
         # Initialize scores from logistic distribution
-        u = np.random.uniform(0, 1, N)
+        u = rng.uniform(0, 1, N)
         self.scores = u / (1 - u)
         self.scores = normalize_scores(self.scores)
 
@@ -307,6 +312,11 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
+        if self.scores.size == 0:
+            raise ValueError("Model scores are empty; fit the model before evaluating.")
+
+        scores = self.scores
+
         # Check if all nodes are known
         for node in ranking:
             if node not in self.node_to_idx:
@@ -319,16 +329,16 @@ class PlackettLuceModel:
             # Full PL model (Eq. 1)
             prob = 1.0
             for r in range(K - 1):
-                numerator = self.scores[indices[r]]
-                denominator = sum(self.scores[indices[i]] for i in range(r, K))
+                numerator = float(scores[indices[r]])
+                denominator = float(np.sum(scores[indices[r:K]]))
                 prob *= numerator / denominator
         else:  # position1
             # Position-1-breaking model (Eq. 14)
-            numerator = self.scores[indices[0]]
-            denominator = sum(self.scores[indices[i]] for i in range(K))
+            numerator = float(scores[indices[0]])
+            denominator = float(np.sum(scores[indices]))
             prob = numerator / denominator
 
-        return prob
+        return float(prob)
 
     def log_likelihood(self, hyperedges: List[Tuple]) -> float:
         """
@@ -346,32 +356,41 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
-        cache_enabled = self.use_cache and self._data_hash_cache is not None
-        data_hash = None
-        if cache_enabled:
-            data_hash = self._hash_hyperedges(hyperedges)
-            cached_value = self._data_hash_cache.get(data_hash)
-            if cached_value is not None:
-                return cached_value
+        if self.scores.size == 0:
+            raise ValueError("Model scores are empty; fit the model before evaluating.")
 
-        _, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(hyperedges)
+        normalized = normalize_hyperedges(hyperedges)
+
+        cache: Optional[CacheDict] = self._data_hash_cache if self.use_cache else None
+        data_hash: Optional[str] = None
+        if cache is not None:
+            data_hash = self._hash_hyperedges(normalized)
+            cached_value = cache.get(data_hash)
+            if cached_value is not None:
+                return float(cached_value)
+
+        _, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(normalized)
 
         if self.model_type == "full":
-            ll = compute_log_likelihood_pl(self.scores, edges, weights, edge_lengths, edge_starts)
+            ll_value = float(
+                compute_log_likelihood_pl(self.scores, edges, weights, edge_lengths, edge_starts)
+            )
         else:
-            ll = compute_log_likelihood_position1(
-                self.scores, edges, weights, edge_lengths, edge_starts
+            ll_value = float(
+                compute_log_likelihood_position1(
+                    self.scores, edges, weights, edge_lengths, edge_starts
+                )
             )
 
-        if cache_enabled and data_hash is not None:
-            if len(self._data_hash_cache) >= 1000:
-                # Remove an arbitrary cached item to control memory usage
-                self._data_hash_cache.pop(next(iter(self._data_hash_cache)))
-            self._data_hash_cache[data_hash] = ll
+        if cache is not None and data_hash is not None:
+            if len(cache) >= 1000:
+                first_key = next(iter(cache))
+                cache.pop(first_key)
+            cache[data_hash] = ll_value
 
-        return ll
+        return ll_value
 
-    def get_ranking(self, top_k: Optional[int] = None) -> List[Tuple]:
+    def get_ranking(self, top_k: Optional[int] = None) -> List[Tuple[Any, float]]:
         """
         Get ranking of all nodes by their scores.
 
@@ -387,7 +406,9 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
-        ranking = [(self.idx_to_node[i], self.scores[i]) for i in range(len(self.scores))]
+        ranking: List[Tuple[Any, float]] = [
+            (self.idx_to_node[i], float(self.scores[i])) for i in range(len(self.scores))
+        ]
         ranking.sort(key=lambda x: x[1], reverse=True)
 
         if top_k is not None:
@@ -395,13 +416,13 @@ class PlackettLuceModel:
 
         return ranking
 
-    def get_score(self, node_id) -> float:
+    def get_score(self, node_id: Any) -> float:
         """Get score for a specific node."""
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
         if node_id not in self.node_to_idx:
             raise ValueError(f"Unknown node: {node_id}")
-        return self.scores[self.node_to_idx[node_id]]
+        return float(self.scores[self.node_to_idx[node_id]])
 
     def save(self, filepath: Union[str, Path]) -> None:
         """Save model to file."""
@@ -416,6 +437,7 @@ class PlackettLuceModel:
             "max_iterations": self.max_iterations,
             "timeout": self.timeout,
             "use_cache": self.use_cache,
+            "random_state": self.random_state,
             "scores": self.scores.tolist(),
             "node_to_idx": self.node_to_idx,
             "idx_to_node": self.idx_to_node,
@@ -438,11 +460,13 @@ class PlackettLuceModel:
             max_iterations=model_data["max_iterations"],
             timeout=model_data.get("timeout"),
             use_cache=model_data.get("use_cache", True),
+            random_state=model_data.get("random_state"),
         )
 
         model.scores = np.array(model_data["scores"])
         model.node_to_idx = model_data["node_to_idx"]
         model.idx_to_node = model_data["idx_to_node"]
         model.is_fitted = True
+        model._data_hash_cache = {} if model.use_cache else None
 
         return model

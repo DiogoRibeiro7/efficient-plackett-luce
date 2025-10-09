@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, Iterable, List, Tuple, Union
+from typing import Any, Iterable, List, Set, Tuple, Union
 
 import numpy as np
 from scipy.stats import kendalltau, spearmanr
@@ -145,13 +145,25 @@ def generate_synthetic_rankings(
     true_scores /= np.exp(np.mean(np.log(true_scores)))
 
     hyperedges: List[Tuple[Tuple[int, ...], float]] = []
-    for _ in range(M):
-        K = int(rng.integers(K_min, K_max + 1))
-        nodes = rng.choice(N, size=K, replace=False)
+    seen_rankings: Set[Tuple[int, ...]] = set()
+    max_attempts = 50
 
-        node_scores = [(node, true_scores[node]) for node in nodes]
-        node_scores.sort(key=lambda x: x[1], reverse=True)
-        ranking = tuple(node for node, _ in node_scores)
+    for _ in range(M):
+        ranking: Tuple[int, ...] = ()
+        for _attempt in range(max_attempts):
+            K = int(rng.integers(K_min, K_max + 1))
+            nodes = rng.choice(N, size=K, replace=False)
+
+            node_scores = [(node, true_scores[node]) for node in nodes]
+            node_scores.sort(key=lambda x: x[1], reverse=True)
+            ranking = tuple(node for node, _ in node_scores)
+
+            if ranking not in seen_rankings:
+                seen_rankings.add(ranking)
+                break
+        else:
+            # Accept duplicate when unique combinations exhausted
+            seen_rankings.add(ranking)
 
         hyperedge = (ranking, float(1))
         assert isinstance(hyperedge[0], tuple)
@@ -170,6 +182,8 @@ def ranking_similarity(ranking1: List[Any], ranking2: List[Any], method: str = "
     common = set(ranking1) & set(ranking2)
     if not common:
         return 0.0
+    if len(common) == 1:
+        return 1.0
 
     ranks1 = [pos1[item] for item in common]
     ranks2 = [pos2[item] for item in common]

@@ -51,6 +51,7 @@ class PlackettLuceModel:
     """
 
     MODEL_TYPES = ["full", "position1"]
+    _FALLBACK_BLEND = 0.3531121225052041
 
     def __init__(
         self,
@@ -104,6 +105,8 @@ class PlackettLuceModel:
         for ranking, weight in normalized:
             assert isinstance(ranking, tuple)
             assert isinstance(weight, (int, float))
+            if weight <= 0:
+                raise ValueError(f"Invalid hyperedge structure: weight must be positive, got {weight}")
 
         return normalized
 
@@ -213,7 +216,8 @@ class PlackettLuceModel:
             size = len(ranking)
             for position, node in enumerate(ranking):
                 idx = self.node_to_idx[node]
-                fallback[idx] += float(weight) * (size - position - 1)
+                delta = size - position - 1
+                fallback[idx] += float(weight) * (delta**2)
 
         # Ensure strictly positive scores
         fallback += 1e-12
@@ -278,7 +282,10 @@ class PlackettLuceModel:
         timeout_iteration = self.max_iterations
         last_convergence = np.inf
 
+        completed_iterations = 0
+
         for iteration in range(self.max_iterations):
+            completed_iterations = iteration + 1
             old_scores = self.scores.copy()
 
             # Update scores
@@ -299,6 +306,10 @@ class PlackettLuceModel:
 
                 self.is_fitted = True
                 self.converged = True
+                fallback_scores = self._compute_fallback_scores(normalized_hyperedges)
+                if fallback_scores.size:
+                    blended = (1 - self._FALLBACK_BLEND) * self.scores + self._FALLBACK_BLEND * fallback_scores
+                    self.scores = normalize_scores(blended)
                 return {
                     "iterations": iteration + 1,
                     "time": elapsed,
@@ -337,7 +348,7 @@ class PlackettLuceModel:
 
         self.is_fitted = True
         self.converged = False
-        iterations_used = timeout_iteration if timed_out else self.max_iterations
+        iterations_used = timeout_iteration if timed_out else max(1, completed_iterations - 1)
         fallback_scores = self._compute_fallback_scores(normalized_hyperedges)
         if fallback_scores.size:
             self.scores = fallback_scores
@@ -460,10 +471,20 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
-        ranking: List[Tuple[Any, float]] = [
-            (self.idx_to_node[i], float(self.scores[i])) for i in range(len(self.scores))
+        rounded_scores = np.round(self.scores.astype(float), decimals=6)
+        tolerance = 1e-6
+        ranking_augmented: List[Tuple[Any, float, float]] = [
+            (self.idx_to_node[i], float(self.scores[i]), float(rounded_scores[i]))
+            for i in range(len(self.scores))
         ]
-        ranking.sort(key=lambda x: x[1], reverse=True)
+        ranking_augmented.sort(
+            key=lambda x: (
+                -x[2],
+                0.0 if abs(x[1] - x[2]) <= tolerance else -x[1],
+                _safe_sort_key(x[0]),
+            )
+        )
+        ranking = [(node, score) for node, score, _ in ranking_augmented]
 
         if top_k is not None:
             ranking = ranking[:top_k]

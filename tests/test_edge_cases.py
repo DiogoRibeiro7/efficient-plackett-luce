@@ -17,7 +17,7 @@ class TestEdgeCases:
         data = [(("A", "B"), 1)]
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         ranking = model.get_ranking()
         assert len(ranking) == 2
@@ -28,7 +28,7 @@ class TestEdgeCases:
         data = [(("A", "B"), 5), (("B", "A"), 2)]
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         ranking = model.get_ranking()
         assert ranking[0][0] == "A"  # A wins more often
@@ -45,7 +45,7 @@ class TestEdgeCases:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         ranking = model.get_ranking()
         assert ranking[0][0] == "A"
@@ -454,7 +454,7 @@ class TestBoundaryConditions:
         data = generate_synthetic_rankings(N=20, M=100, seed=42)
 
         model = PlackettLuceModel(model_type="full", epsilon=1e-10, max_iterations=10)
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         # Should stop at max iterations
         assert stats["iterations"] == 10
@@ -465,7 +465,7 @@ class TestBoundaryConditions:
         data = [(("A", "B"), 1)]
 
         model = PlackettLuceModel(model_type="full", epsilon=0.0, max_iterations=5)
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         # Should always hit max iterations
         assert stats["iterations"] == 5

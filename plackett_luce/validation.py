@@ -74,11 +74,6 @@ def train_test_split(
     if n_samples == 0:
         raise ValueError("hyperedges cannot be empty")
 
-    rng = _create_rng(random_state)
-    indices = np.arange(n_samples)
-    if shuffle:
-        indices = rng.permutation(indices)
-
     desired_test = int(n_samples * test_size)
     n_test = desired_test
     if n_test <= 0:
@@ -88,8 +83,65 @@ def train_test_split(
 
     n_train = n_samples - n_test
 
-    train_indices = indices[:n_train]
-    test_indices = indices[n_train : n_train + n_test]
+    rng = _create_rng(random_state)
+    if shuffle:
+        permuted = np.asarray(rng.permutation(np.arange(n_samples)), dtype=int)
+        train_indices = permuted[:n_train]
+        test_indices = permuted[n_train : n_train + n_test]
+
+        train_index_set = {int(i) for i in train_indices}
+        test_index_set = {int(i) for i in test_indices}
+
+        key_to_train: Dict[Hyperedge, set[int]] = {}
+        for idx in train_index_set:
+            key_to_train.setdefault(data[idx], set()).add(idx)
+        key_to_test: Dict[Hyperedge, set[int]] = {}
+        for idx in test_index_set:
+            key_to_test.setdefault(data[idx], set()).add(idx)
+
+        overlap_keys = set(key_to_train.keys()) & set(key_to_test.keys())
+        if overlap_keys:
+            move_from_test = {idx for key in overlap_keys for idx in key_to_test[key]}
+            test_index_set.difference_update(move_from_test)
+            train_index_set.update(move_from_test)
+
+        # Fill back test set to desired size preferring unique comparisons
+        if len(test_index_set) != n_test:
+            test_keys = {data[idx] for idx in test_index_set}
+            deficit = n_test - len(test_index_set)
+            if deficit > 0:
+                for idx in permuted:
+                    if idx in train_index_set and data[idx] not in test_keys:
+                        train_index_set.remove(idx)
+                        test_index_set.add(idx)
+                        test_keys.add(data[idx])
+                        deficit -= 1
+                        if deficit == 0:
+                            break
+            if deficit > 0:
+                for idx in permuted:
+                    if idx in train_index_set:
+                        train_index_set.remove(idx)
+                        test_index_set.add(idx)
+                        deficit -= 1
+                        if deficit == 0:
+                            break
+
+            surplus = len(test_index_set) - n_test
+            if surplus > 0:
+                for idx in reversed(permuted.tolist()):
+                    if idx in test_index_set:
+                        test_index_set.remove(idx)
+                        train_index_set.add(idx)
+                        surplus -= 1
+                        if surplus == 0:
+                            break
+
+        train_indices = np.array(sorted(train_index_set), dtype=int)
+        test_indices = np.array(sorted(test_index_set), dtype=int)
+    else:
+        train_indices = np.arange(n_train, dtype=int)
+        test_indices = np.arange(n_train, n_train + n_test, dtype=int)
 
     train: List[Hyperedge] = [
         cast(Hyperedge, tuple(data[int(i)])) for i in np.sort(train_indices)

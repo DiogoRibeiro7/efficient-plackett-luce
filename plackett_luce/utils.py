@@ -74,7 +74,9 @@ def normalize_hyperedges(hyperedges: Iterable[Any]) -> List[Hyperedge]:
         unique_ranking: List[Any] = []
         for node in ranking_tuple:
             if node in seen:
-                raise ValueError(f"Ranking contains duplicate node {node!r} at index {idx}")
+                raise ValueError(
+                    f"Ranking contains duplicate nodes (e.g., {node!r}) at index {idx}"
+                )
             seen.add(node)
             unique_ranking.append(node)
 

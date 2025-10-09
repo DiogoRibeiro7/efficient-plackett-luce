@@ -45,7 +45,7 @@ class TestEdgeCases:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         ranking = model.get_ranking()
         assert ranking[0][0] == "A"
@@ -60,7 +60,7 @@ class TestEdgeCases:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         # Should still converge and produce rankings
         assert model.is_fitted

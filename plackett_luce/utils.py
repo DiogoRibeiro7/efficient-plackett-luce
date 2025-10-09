@@ -85,8 +85,8 @@ def normalize_hyperedges(hyperedges: Iterable[Any]) -> List[Hyperedge]:
         weight = _python_scalar(weight_raw)
         if not isinstance(weight, (int, float)):
             raise ValueError(f"Weight must be numeric at index {idx}, got {type(weight).__name__}")
-        if weight <= 0:
-            raise ValueError(f"Weight must be positive at index {idx}, got {weight}")
+        if weight < 0:
+            raise ValueError(f"Weight must be non-negative at index {idx}, got {weight}")
 
         normalized.append((ranking, weight))
 

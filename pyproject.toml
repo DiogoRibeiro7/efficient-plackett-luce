@@ -7,7 +7,7 @@ name = "efficient-plackett-luce"
 version = "0.1.0"
 description = "Fast inference for multi-body rankings using Newman's efficient algorithm"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
     {name = "Diogo Ribeiro", email = "dfr@esmad.ipp.pt"}

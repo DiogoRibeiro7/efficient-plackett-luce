@@ -10,8 +10,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="efficient-plackett-luce",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Diogo Ribeiro",
+    author_email="dfr@esmad.ipp.pt",
     description="Fast inference for multi-body rankings using Newman's efficient algorithm",
     long_description=long_description,
     long_description_content_type="text/markdown",

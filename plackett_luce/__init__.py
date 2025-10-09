@@ -6,7 +6,7 @@ model, achieving 5-70x speedup over traditional methods.
 """
 
 __version__ = "0.1.0"
-__author__ = "Your Name"
+__author__ = "Diogo Ribeiro"
 __license__ = "MIT"
 
 from .core import PlackettLuceModel

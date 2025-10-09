@@ -22,6 +22,7 @@ class TestEdgeCases:
         ranking = model.get_ranking()
         assert len(ranking) == 2
         assert ranking[0][0] == "A"  # A beats B
+        assert stats["iterations"] > 0
 
     def test_two_node_tournament(self):
         """Test with only two nodes."""
@@ -32,6 +33,7 @@ class TestEdgeCases:
 
         ranking = model.get_ranking()
         assert ranking[0][0] == "A"  # A wins more often
+        assert stats["iterations"] > 0
 
     def test_complete_dominance(self):
         """Test when one node always wins."""
@@ -45,11 +47,12 @@ class TestEdgeCases:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         ranking = model.get_ranking()
         assert ranking[0][0] == "A"
         assert ranking[-1][0] == "D"
+        assert stats["iterations"] > 0
 
     def test_circular_rankings(self):
         """Test with circular dominance (A>B, B>C, C>A)."""
@@ -387,7 +390,7 @@ class TestNumericalStability:
         data = base_data + noise
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         # Should still converge
         assert stats["iterations"] < model.max_iterations
@@ -423,7 +426,7 @@ class TestBoundaryConditions:
         data = generate_synthetic_rankings(N=N, M=1000, K_min=2, K_max=10, seed=42)
 
         model = PlackettLuceModel(model_type="full")
-        model.fit(data, verbose=False)
+        stats = model.fit(data, verbose=False)
 
         assert len(model.scores) == N
         assert stats["time"] < 120  # Should complete in reasonable time

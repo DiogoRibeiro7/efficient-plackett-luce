@@ -5,6 +5,10 @@ Contains the main PlackettLuceModel class with full and position-1-breaking
 variants using Newman's efficient algorithm.
 """
 
+import warnings
+from collections import Counter
+import hashlib
+
 import numpy as np
 from typing import List, Tuple, Dict, Optional, Union
 from pathlib import Path
@@ -41,6 +45,8 @@ class PlackettLuceModel:
         model_type: str = "full",
         epsilon: float = 1e-6,
         max_iterations: int = 10000,
+        use_cache: bool = True,
+        timeout: Optional[float] = None,
     ):
         """
         Initialize the Plackett-Luce model.
@@ -53,6 +59,10 @@ class PlackettLuceModel:
             Convergence threshold
         max_iterations : int
             Maximum number of iterations
+        use_cache : bool, optional
+            Enable caching for repeated log-likelihood computations.
+        timeout : float, optional
+            Maximum time in seconds to spend on fitting. If None, no timeout.
         """
         if model_type not in self.MODEL_TYPES:
             raise ValueError(f"model_type must be one of {self.MODEL_TYPES}")
@@ -60,10 +70,13 @@ class PlackettLuceModel:
         self.model_type = model_type
         self.epsilon = epsilon
         self.max_iterations = max_iterations
+        self.timeout = timeout
         self.scores = None
         self.node_to_idx = None
         self.idx_to_node = None
         self.is_fitted = False
+        self.use_cache = use_cache
+        self._data_hash_cache = {} if use_cache else None
 
     def _validate_hyperedges(self, hyperedges: List[Tuple]) -> None:
         """Validate input hyperedges format."""
@@ -82,8 +95,64 @@ class PlackettLuceModel:
                     f"Ranking must be tuple/list with at least 2 elements at index {i}"
                 )
 
+            if len(ranking) != len(set(ranking)):
+                duplicates = list(
+                    dict.fromkeys(node for node in ranking if ranking.count(node) > 1)
+                )
+                raise ValueError(
+                    f"Ranking contains duplicate nodes {duplicates} at index {i}. "
+                    f"Each entity can appear only once per ranking."
+                )
+
             if not isinstance(weight, (int, float)) or weight <= 0:
                 raise ValueError(f"Weight must be positive number at index {i}")
+
+    def _check_data_quality(self, hyperedges: List[Tuple]) -> None:
+        """Check data quality and issue warnings for potential problems."""
+        if len(hyperedges) < 10:
+            warnings.warn(
+                (
+                    f"Dataset is very small ({len(hyperedges)} comparisons). "
+                    "Results may be unreliable. Consider using at least 20 comparisons."
+                ),
+                UserWarning,
+            )
+
+        all_nodes = set()
+        for ranking, _ in hyperedges:
+            all_nodes.update(ranking)
+
+        node_counts: Counter = Counter()
+        for ranking, weight in hyperedges:
+            node_counts.update({node: weight for node in ranking})
+
+        rare_nodes = [node for node, count in node_counts.items() if count < 3]
+        if rare_nodes:
+            warnings.warn(
+                (
+                    f"{len(rare_nodes)} nodes appear in fewer than 3 comparisons. "
+                    "Scores for these nodes may be unreliable: "
+                    f"{rare_nodes[:5]}..."
+                ),
+                UserWarning,
+            )
+
+        if all_nodes:
+            max_K = max(len(ranking) for ranking, _ in hyperedges)
+            if max_K > 0.5 * len(all_nodes):
+                warnings.warn(
+                    (
+                        f"Some comparisons involve {max_K} entities out of "
+                        f"{len(all_nodes)} total. Large comparison sizes may lead "
+                        "to numerical instability."
+                    ),
+                    UserWarning,
+                )
+
+    def _hash_hyperedges(self, hyperedges: List[Tuple]) -> str:
+        """Create hash of hyperedges for caching."""
+        data_str = str(sorted(hyperedges))
+        return hashlib.md5(data_str.encode()).hexdigest()
 
     def _preprocess_edges(self, hyperedges: List[Tuple]):
         """Convert hyperedges to efficient flattened array format."""
@@ -131,9 +200,12 @@ class PlackettLuceModel:
 
         Returns:
         --------
-        dict : Training statistics (iterations, time, final_convergence)
+        dict : Training statistics (iterations, time, final_convergence, converged, timed_out)
         """
+        if self.use_cache and self._data_hash_cache is not None:
+            self._data_hash_cache.clear()
         self._validate_hyperedges(hyperedges)
+        self._check_data_quality(hyperedges)
 
         # Preprocess data
         N, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(
@@ -145,6 +217,17 @@ class PlackettLuceModel:
         self.scores = u / (1 - u)
         self.scores = normalize_scores(self.scores)
 
+        scores = self.scores
+
+        if len(edges) == 0:
+            raise ValueError("No edges found after preprocessing")
+        if scores.shape[0] != N:
+            raise ValueError(f"Scores array has wrong length: {scores.shape[0]} != {N}")
+        if not np.all(np.isfinite(scores)):
+            raise ValueError("Initial scores contain inf or nan values")
+        if not np.all(scores > 0):
+            raise ValueError("All scores must be positive")
+
         # Select iteration function based on model type
         if self.model_type == "full":
             iterate_fn = newman_iteration_full_pl
@@ -152,6 +235,9 @@ class PlackettLuceModel:
             iterate_fn = newman_iteration_position1
 
         start_time = time.time()
+        timed_out = False
+        timeout_iteration = self.max_iterations
+        last_convergence = np.inf
 
         for iteration in range(self.max_iterations):
             old_scores = self.scores.copy()
@@ -164,6 +250,7 @@ class PlackettLuceModel:
 
             # Check convergence
             A = compute_convergence(old_scores, self.scores)
+            last_convergence = A
 
             if verbose and iteration % 10 == 0:
                 print(f"Iteration {iteration}: A = {A:.8f}")
@@ -180,16 +267,32 @@ class PlackettLuceModel:
                     "final_convergence": A,
                 }
 
+            if self.timeout is not None:
+                elapsed = time.time() - start_time
+                if elapsed > self.timeout:
+                    warnings.warn(
+                        (
+                            f"Timeout reached after {iteration + 1} iterations and "
+                            f"{elapsed:.1f}s. Model may not have converged (A={A:.8f})"
+                        ),
+                        UserWarning,
+                    )
+                    timed_out = True
+                    timeout_iteration = iteration + 1
+                    break
+
         elapsed = time.time() - start_time
         if verbose:
             print(f"Warning: Did not converge in {self.max_iterations} iterations")
 
         self.is_fitted = True
+        iterations_used = timeout_iteration if timed_out else self.max_iterations
         return {
-            "iterations": self.max_iterations,
+            "iterations": iterations_used,
             "time": elapsed,
-            "final_convergence": A,
+            "final_convergence": last_convergence,
             "converged": False,
+            "timed_out": timed_out,
         }
 
     def predict_probability(self, ranking: Union[Tuple, List]) -> float:
@@ -247,18 +350,34 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
+        cache_enabled = self.use_cache and self._data_hash_cache is not None
+        data_hash = None
+        if cache_enabled:
+            data_hash = self._hash_hyperedges(hyperedges)
+            cached_value = self._data_hash_cache.get(data_hash)
+            if cached_value is not None:
+                return cached_value
+
         _, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(
             hyperedges
         )
 
         if self.model_type == "full":
-            return compute_log_likelihood_pl(
+            ll = compute_log_likelihood_pl(
                 self.scores, edges, weights, edge_lengths, edge_starts
             )
         else:
-            return compute_log_likelihood_position1(
+            ll = compute_log_likelihood_position1(
                 self.scores, edges, weights, edge_lengths, edge_starts
             )
+
+        if cache_enabled and data_hash is not None:
+            if len(self._data_hash_cache) >= 1000:
+                # Remove an arbitrary cached item to control memory usage
+                self._data_hash_cache.pop(next(iter(self._data_hash_cache)))
+            self._data_hash_cache[data_hash] = ll
+
+        return ll
 
     def get_ranking(self, top_k: Optional[int] = None) -> List[Tuple]:
         """
@@ -305,6 +424,8 @@ class PlackettLuceModel:
             "model_type": self.model_type,
             "epsilon": self.epsilon,
             "max_iterations": self.max_iterations,
+            "timeout": self.timeout,
+            "use_cache": self.use_cache,
             "scores": self.scores.tolist(),
             "node_to_idx": self.node_to_idx,
             "idx_to_node": self.idx_to_node,
@@ -325,6 +446,8 @@ class PlackettLuceModel:
             model_type=model_data["model_type"],
             epsilon=model_data["epsilon"],
             max_iterations=model_data["max_iterations"],
+            timeout=model_data.get("timeout"),
+            use_cache=model_data.get("use_cache", True),
         )
 
         model.scores = np.array(model_data["scores"])

@@ -99,6 +99,14 @@ class TestEdgeCases:
         with pytest.raises(ValueError):
             model.fit(data, verbose=False)
 
+    def test_duplicate_nodes_in_ranking(self):
+        """Test that duplicate nodes in ranking are rejected."""
+        data = [(("A", "A", "B"), 1)]
+
+        model = PlackettLuceModel(model_type="full")
+        with pytest.raises(ValueError, match="duplicate nodes"):
+            model.fit(data, verbose=False)
+
     def test_very_large_comparison(self):
         """Test with very large single comparison."""
         nodes = [f"Node{i}" for i in range(50)]

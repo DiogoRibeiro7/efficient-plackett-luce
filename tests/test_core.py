@@ -4,6 +4,7 @@ Tests for core Plackett-Luce model functionality.
 
 import pytest
 import numpy as np
+import plackett_luce.core as core
 from plackett_luce import PlackettLuceModel
 from plackett_luce.utils import generate_synthetic_rankings
 
@@ -117,7 +118,7 @@ class TestPlackettLuceModel:
         """Test saving and loading models."""
         data = [(("A", "B", "C"), 1), (("B", "C"), 1)]
 
-        model = PlackettLuceModel(model_type="full")
+        model = PlackettLuceModel(model_type="full", use_cache=False, timeout=5.0)
         model.fit(data, verbose=False)
 
         # Save
@@ -131,6 +132,8 @@ class TestPlackettLuceModel:
         assert loaded_model.model_type == model.model_type
         assert np.allclose(loaded_model.scores, model.scores)
         assert loaded_model.node_to_idx == model.node_to_idx
+        assert loaded_model.use_cache is False
+        assert loaded_model.timeout == 5.0
 
     def test_position1_model(self):
         """Test position-1-breaking model."""
@@ -169,3 +172,70 @@ class TestPlackettLuceModel:
         # Geometric mean should be close to 1
         geometric_mean = np.exp(np.mean(np.log(model.scores)))
         assert np.isclose(geometric_mean, 1.0, atol=1e-6)
+
+    def test_warning_small_dataset(self):
+        """Dataset with fewer than 10 comparisons should trigger warning."""
+        data = [
+            (("A", "B"), 1),
+            (("B", "A"), 1),
+            (("A", "B"), 1),
+            (("C", "D"), 1),
+            (("D", "C"), 1),
+            (("C", "D"), 1),
+            (("E", "A"), 1),
+            (("E", "C"), 1),
+            (("E", "B"), 1),
+        ]  # 9 comparisons
+
+        model = PlackettLuceModel(model_type="full")
+        with pytest.warns(UserWarning, match="Dataset is very small"):
+            model.fit(data, verbose=False)
+
+    def test_warning_rare_nodes(self):
+        """Nodes appearing in fewer than 3 comparisons should trigger warning."""
+        common_comparisons = [
+            (("A", "B", "C"), 1),
+            (("B", "C", "D"), 1),
+            (("C", "D", "E"), 1),
+            (("A", "D", "E"), 1),
+            (("A", "B", "E"), 1),
+            (("B", "C", "E"), 1),
+            (("A", "C", "D"), 1),
+            (("B", "D", "E"), 1),
+        ]
+        rare_comparisons = [
+            (("Z", "A", "B"), 1),
+            (("Z", "C", "D"), 1),
+        ]
+        data = common_comparisons + rare_comparisons  # 10 comparisons
+
+        model = PlackettLuceModel(model_type="full")
+        with pytest.warns(UserWarning, match="fewer than 3 comparisons"):
+            model.fit(data, verbose=False)
+
+    def test_warning_large_comparison(self):
+        """Very large comparison sizes should trigger warning."""
+        data = [(("A", "B", "C", "D"), 1) for _ in range(12)]
+
+        model = PlackettLuceModel(model_type="full")
+        with pytest.warns(UserWarning, match="Large comparison sizes"):
+            model.fit(data, verbose=False)
+
+    def test_fit_timeout(self, monkeypatch):
+        """Timeout should abort fitting and emit warning."""
+        data = generate_synthetic_rankings(N=8, M=40, seed=3)
+
+        times = [0.0, 2.0]
+
+        def fake_time():
+            return times.pop(0) if times else 2.0
+
+        monkeypatch.setattr(core.time, "time", fake_time)
+
+        model = PlackettLuceModel(model_type="full", timeout=1.0)
+        with pytest.warns(UserWarning, match="Timeout reached"):
+            stats = model.fit(data, verbose=False)
+
+        assert stats["timed_out"] is True
+        assert stats["converged"] is False
+        assert stats["iterations"] <= model.max_iterations

@@ -2,17 +2,18 @@
 Tests for validation utilities.
 """
 
-import pytest
 import numpy as np
+import pytest
+
+from plackett_luce import PlackettLuceModel
+from plackett_luce.utils import generate_synthetic_rankings
 from plackett_luce.validation import (
-    train_test_split,
-    stratified_split_by_size,
-    temporal_split,
     cross_validate,
     leave_one_out_cv,
+    stratified_split_by_size,
+    temporal_split,
+    train_test_split,
 )
-from plackett_luce.utils import generate_synthetic_rankings
-from plackett_luce import PlackettLuceModel
 
 
 class TestLeaveOneOutCV:
@@ -212,9 +213,7 @@ class TestTrainTestSplitAdvanced:
         """Test that shuffle actually shuffles."""
         data = [(("A", "B"), i) for i in range(50)]
 
-        train, test = train_test_split(
-            data, test_size=0.2, shuffle=True, random_state=42
-        )
+        train, test = train_test_split(data, test_size=0.2, shuffle=True, random_state=42)
 
         # Train should not be the first 40 items
         assert train != data[:40]
@@ -357,9 +356,7 @@ class TestStratifiedSplitAdvanced:
         ]
 
         # Stratified split
-        train_strat, test_strat = stratified_split_by_size(
-            data, test_size=0.2, random_state=42
-        )
+        train_strat, test_strat = stratified_split_by_size(data, test_size=0.2, random_state=42)
 
         # Random split
         train_rand, test_rand = train_test_split(data, test_size=0.2, random_state=42)
@@ -370,15 +367,18 @@ class TestStratifiedSplitAdvanced:
         test_strat_sizes = Counter(len(r) for r, _ in test_strat)
         test_rand_sizes = Counter(len(r) for r, _ in test_rand)
 
+        assert test_strat_sizes[2] > 0
+        assert test_strat_sizes[5] > 0
+        assert test_strat_sizes[5] >= test_rand_sizes[5]
+
         # Stratified should be more balanced
         # (This may not always differ, but typically should)
 
     def test_stratified_with_rare_sizes(self):
         """Test stratified split with rare comparison sizes."""
-        data = (
-            [(("A", "B"), 1) for _ in range(50)]
-            + [(("C", "D", "E", "F", "G", "H", "I", "J"), 1)]  # Only 1 large comparison
-        )
+        data = [(("A", "B"), 1) for _ in range(50)] + [
+            (("C", "D", "E", "F", "G", "H", "I", "J"), 1)
+        ]  # Only 1 large comparison
 
         train, test = stratified_split_by_size(data, test_size=0.2, random_state=42)
 
@@ -387,9 +387,7 @@ class TestStratifiedSplitAdvanced:
 
     def test_stratified_perfect_balance(self):
         """Test stratified split with perfectly balanced data."""
-        data = [(("A", "B"), 1) for _ in range(25)] + [
-            (("C", "D", "E"), 1) for _ in range(25)
-        ]
+        data = [(("A", "B"), 1) for _ in range(25)] + [(("C", "D", "E"), 1) for _ in range(25)]
 
         train, test = stratified_split_by_size(data, test_size=0.2, random_state=42)
 
@@ -456,9 +454,7 @@ class TestTemporalSplitAdvanced:
         # Simulate tournament rounds over time
         data = []
         for round_num in range(10):
-            round_data = generate_synthetic_rankings(
-                N=5, M=10, K_min=2, K_max=3, seed=round_num
-            )
+            round_data = generate_synthetic_rankings(N=5, M=10, K_min=2, K_max=3, seed=round_num)
             data.extend(round_data)
 
         train, test = temporal_split(data, test_size=0.2)
@@ -727,8 +723,7 @@ class TestValidationIntegration:
     def test_validation_pipeline_robustness(self):
         """Test that validation pipeline is robust to various inputs."""
         datasets = [
-            generate_synthetic_rankings(N=5, M=20, K_min=2, K_max=3, seed=i)
-            for i in range(3)
+            generate_synthetic_rankings(N=5, M=20, K_min=2, K_max=3, seed=i) for i in range(3)
         ]
 
         for data in datasets:
@@ -837,9 +832,7 @@ class TestValidationEdgeCases:
     def test_cv_with_inconsistent_nodes(self):
         """Test CV when not all nodes appear in all folds."""
         # Create data where some nodes are rare
-        data = (
-            [(("A", "B"), 1) for _ in range(20)] + [(("X", "Y"), 1)]  # Rare nodes
-        )
+        data = [(("A", "B"), 1) for _ in range(20)] + [(("X", "Y"), 1)]  # Rare nodes
 
         # Should handle gracefully
         results = cross_validate(
@@ -924,9 +917,7 @@ class TestValidationStatistics:
         # Create two datasets: one consistent, one variable
         consistent_data = [(("A", "B", "C"), 1) for _ in range(50)]
 
-        variable_data = generate_synthetic_rankings(
-            N=20, M=50, K_min=2, K_max=8, seed=42
-        )
+        variable_data = generate_synthetic_rankings(N=20, M=50, K_min=2, K_max=8, seed=42)
 
         results_consistent = cross_validate(
             consistent_data,
@@ -974,9 +965,7 @@ class TestValidationStatistics:
         # Multiple splits with same test_size
         splits = []
         for seed in range(10):
-            train, test = train_test_split(
-                data, test_size=0.2, random_state=seed, shuffle=True
-            )
+            train, test = train_test_split(data, test_size=0.2, random_state=seed, shuffle=True)
             test_indices = [item[1] for item in test]
             splits.append(set(test_indices))
 

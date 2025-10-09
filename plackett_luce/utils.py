@@ -99,9 +99,7 @@ def generate_synthetic_rankings(
     if M < 1:
         raise ValueError(f"M must be a positive integer, got {M}")
     if K_min < 2:
-        raise ValueError(
-            f"K_min must be at least 2 for meaningful comparisons, got {K_min}"
-        )
+        raise ValueError(f"K_min must be at least 2 for meaningful comparisons, got {K_min}")
     if K_max > N:
         raise ValueError(f"K_max ({K_max}) cannot exceed N ({N})")
     if K_min > K_max:
@@ -141,9 +139,7 @@ def generate_synthetic_rankings(
     return hyperedges
 
 
-def ranking_similarity(
-    ranking1: List[Any], ranking2: List[Any], method: str = "kendall"
-) -> float:
+def ranking_similarity(ranking1: List[Any], ranking2: List[Any], method: str = "kendall") -> float:
     """
     Compute similarity between two rankings.
 

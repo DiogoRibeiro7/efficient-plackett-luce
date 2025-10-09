@@ -5,8 +5,9 @@ Converts multi-body comparisons to pairwise comparisons for comparison
 with the full multi-body model.
 """
 
+from typing import Dict, List, Tuple
+
 from .core import PlackettLuceModel
-from typing import List, Tuple, Dict
 
 
 class ProjectedPlackettLuce(PlackettLuceModel):

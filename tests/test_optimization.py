@@ -2,13 +2,13 @@
 Tests for optimization functions.
 """
 
-import pytest
 import numpy as np
+
 from plackett_luce.optimization import (
-    normalize_scores,
     compute_convergence,
-    newman_iteration_full_pl,
     compute_log_likelihood_pl,
+    newman_iteration_full_pl,
+    normalize_scores,
 )
 
 
@@ -54,9 +54,7 @@ class TestOptimizationFunctions:
         edge_lengths = np.array([3], dtype=np.int32)
         edge_starts = np.array([0], dtype=np.int32)
 
-        new_scores = newman_iteration_full_pl(
-            scores, edges, weights, edge_lengths, edge_starts
-        )
+        new_scores = newman_iteration_full_pl(scores, edges, weights, edge_lengths, edge_starts)
 
         assert len(new_scores) == N
         assert np.all(new_scores > 0)
@@ -71,9 +69,7 @@ class TestOptimizationFunctions:
         edge_lengths = np.array([3], dtype=np.int32)
         edge_starts = np.array([0], dtype=np.int32)
 
-        ll = compute_log_likelihood_pl(
-            scores, edges, weights, edge_lengths, edge_starts
-        )
+        ll = compute_log_likelihood_pl(scores, edges, weights, edge_lengths, edge_starts)
 
         assert isinstance(ll, float)
         assert ll < 0  # Log-likelihood should be negative

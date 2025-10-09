@@ -5,23 +5,23 @@ Contains the main PlackettLuceModel class with full and position-1-breaking
 variants using Newman's efficient algorithm.
 """
 
-import warnings
-from collections import Counter
 import hashlib
-
-import numpy as np
-from typing import List, Tuple, Dict, Optional, Union
-from pathlib import Path
 import pickle
 import time
+import warnings
+from collections import Counter
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 from .optimization import (
-    normalize_scores,
     compute_convergence,
-    newman_iteration_full_pl,
-    newman_iteration_position1,
     compute_log_likelihood_pl,
     compute_log_likelihood_position1,
+    newman_iteration_full_pl,
+    newman_iteration_position1,
+    normalize_scores,
 )
 
 
@@ -208,9 +208,7 @@ class PlackettLuceModel:
         self._check_data_quality(hyperedges)
 
         # Preprocess data
-        N, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(
-            hyperedges
-        )
+        N, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(hyperedges)
 
         # Initialize scores from logistic distribution
         u = np.random.uniform(0, 1, N)
@@ -243,9 +241,7 @@ class PlackettLuceModel:
             old_scores = self.scores.copy()
 
             # Update scores
-            self.scores = iterate_fn(
-                self.scores, edges, weights, edge_lengths, edge_starts
-            )
+            self.scores = iterate_fn(self.scores, edges, weights, edge_lengths, edge_starts)
             self.scores = normalize_scores(self.scores)
 
             # Check convergence
@@ -358,14 +354,10 @@ class PlackettLuceModel:
             if cached_value is not None:
                 return cached_value
 
-        _, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(
-            hyperedges
-        )
+        _, edges, weights, edge_lengths, edge_starts = self._preprocess_edges(hyperedges)
 
         if self.model_type == "full":
-            ll = compute_log_likelihood_pl(
-                self.scores, edges, weights, edge_lengths, edge_starts
-            )
+            ll = compute_log_likelihood_pl(self.scores, edges, weights, edge_lengths, edge_starts)
         else:
             ll = compute_log_likelihood_position1(
                 self.scores, edges, weights, edge_lengths, edge_starts
@@ -395,9 +387,7 @@ class PlackettLuceModel:
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
 
-        ranking = [
-            (self.idx_to_node[i], self.scores[i]) for i in range(len(self.scores))
-        ]
+        ranking = [(self.idx_to_node[i], self.scores[i]) for i in range(len(self.scores))]
         ranking.sort(key=lambda x: x[1], reverse=True)
 
         if top_k is not None:

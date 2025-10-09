@@ -72,9 +72,7 @@ def train_test_split(
     cross_validate : Full k-fold cross-validation for model assessment.
     """
     if not 0.0 < test_size < 1.0:
-        raise ValueError(
-            f"test_size must be between 0.0 and 1.0 (exclusive), got {test_size}"
-        )
+        raise ValueError(f"test_size must be between 0.0 and 1.0 (exclusive), got {test_size}")
 
     if not hyperedges:
         raise ValueError("hyperedges cannot be empty")
@@ -143,15 +141,11 @@ def stratified_split_by_size(
         raise ValueError("hyperedges cannot be empty")
 
     if not 0.0 < test_size < 1.0:
-        raise ValueError(
-            f"test_size must be between 0.0 and 1.0 (exclusive), got {test_size}"
-        )
+        raise ValueError(f"test_size must be between 0.0 and 1.0 (exclusive), got {test_size}")
 
     if random_state is not None:
         if not isinstance(random_state, int):
-            raise TypeError(
-                f"random_state must be an integer or None, got {random_state!r}"
-            )
+            raise TypeError(f"random_state must be an integer or None, got {random_state!r}")
         np.random.seed(random_state)
 
     # Group by comparison size
@@ -318,9 +312,7 @@ def cross_validate(
 
     dataset_size = len(hyperedges)
     if n_splits > dataset_size:
-        raise ValueError(
-            f"n_splits ({n_splits}) cannot exceed dataset size ({dataset_size})"
-        )
+        raise ValueError(f"n_splits ({n_splits}) cannot exceed dataset size ({dataset_size})")
 
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
@@ -408,9 +400,7 @@ def cross_validate(
                     f"Projected: {ll_proj:.4f}"
                 )
             else:
-                fold_messages.append(
-                    f"  Fold {fold_index + 1}/{n_splits} - PL: {ll_pl:.4f}"
-                )
+                fold_messages.append(f"  Fold {fold_index + 1}/{n_splits} - PL: {ll_pl:.4f}")
 
     results = {
         "pl_mean": np.mean(scores_pl),
@@ -441,9 +431,7 @@ def cross_validate(
         else:
             results["winner"] = "Projected"
             improvement = (
-                (results["projected_mean"] - results["pl_mean"])
-                / abs(results["pl_mean"])
-                * 100
+                (results["projected_mean"] - results["pl_mean"]) / abs(results["pl_mean"]) * 100
             )
 
         results["improvement"] = improvement
@@ -459,10 +447,7 @@ def cross_validate(
                 f"Mean Projected: {results['projected_mean']:.4f} +/- "
                 f"{results['projected_std']:.4f}"
             )
-            print(
-                f"Winner: {results['winner']} "
-                f"({results['improvement']:.1f}% improvement)"
-            )
+            print(f"Winner: {results['winner']} " f"({results['improvement']:.1f}% improvement)")
 
     return results
 

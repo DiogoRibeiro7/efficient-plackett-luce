@@ -2,8 +2,9 @@
 Comprehensive tests for utility functions.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from plackett_luce.utils import (
     generate_synthetic_rankings,
     ranking_similarity,
@@ -52,9 +53,7 @@ class TestGenerateSyntheticRankings:
     def test_comparison_size_bounds(self):
         """Test that comparison sizes respect K_min and K_max."""
         K_min, K_max = 3, 7
-        data = generate_synthetic_rankings(
-            N=20, M=100, K_min=K_min, K_max=K_max, seed=42
-        )
+        data = generate_synthetic_rankings(N=20, M=100, K_min=K_min, K_max=K_max, seed=42)
 
         for ranking, _ in data:
             K = len(ranking)

@@ -2,11 +2,11 @@
 Tests for edge cases, ties, and error handling.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from plackett_luce import PlackettLuceModel, ProjectedPlackettLuce
 from plackett_luce.utils import generate_synthetic_rankings
-from plackett_luce.validation import train_test_split
 
 
 class TestEdgeCases:
@@ -60,7 +60,7 @@ class TestEdgeCases:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         # Should still converge and produce rankings
         assert model.is_fitted
@@ -113,7 +113,7 @@ class TestEdgeCases:
         data = [(tuple(nodes), 1)]
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         assert model.is_fitted
         assert len(model.scores) == 50
@@ -185,7 +185,7 @@ class TestTieHandling:
         ]
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         assert model.is_fitted
         assert len(model.scores) == 6
@@ -387,7 +387,7 @@ class TestNumericalStability:
         data = base_data + noise
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         # Should still converge
         assert stats["iterations"] < model.max_iterations
@@ -397,7 +397,7 @@ class TestNumericalStability:
         data = generate_synthetic_rankings(N=10, M=50, seed=42)
 
         model = PlackettLuceModel(model_type="full", epsilon=1e-10)
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         # Might take more iterations but should converge
         assert model.is_fitted
@@ -423,7 +423,7 @@ class TestBoundaryConditions:
         data = generate_synthetic_rankings(N=N, M=1000, K_min=2, K_max=10, seed=42)
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         assert len(model.scores) == N
         assert stats["time"] < 120  # Should complete in reasonable time
@@ -454,7 +454,7 @@ class TestBoundaryConditions:
         data = generate_synthetic_rankings(N=20, M=100, seed=42)
 
         model = PlackettLuceModel(model_type="full", epsilon=1e-10, max_iterations=10)
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         # Should stop at max iterations
         assert stats["iterations"] == 10
@@ -465,7 +465,7 @@ class TestBoundaryConditions:
         data = [(("A", "B"), 1)]
 
         model = PlackettLuceModel(model_type="full", epsilon=0.0, max_iterations=5)
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         # Should always hit max iterations
         assert stats["iterations"] == 5

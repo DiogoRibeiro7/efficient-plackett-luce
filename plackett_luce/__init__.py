@@ -11,8 +11,8 @@ __license__ = "MIT"
 
 from .core import PlackettLuceModel
 from .projected import ProjectedPlackettLuce
-from .validation import cross_validate, train_test_split
 from .utils import generate_synthetic_rankings, ranking_similarity
+from .validation import cross_validate, train_test_split
 
 __all__ = [
     "PlackettLuceModel",

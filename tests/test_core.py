@@ -2,8 +2,9 @@
 Tests for core Plackett-Luce model functionality.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 import plackett_luce.core as core
 from plackett_luce import PlackettLuceModel
 from plackett_luce.utils import generate_synthetic_rankings
@@ -17,7 +18,7 @@ class TestPlackettLuceModel:
         model = PlackettLuceModel(model_type="full")
         assert model.model_type == "full"
         assert model.epsilon == 1e-6
-        assert model.is_fitted == False
+        assert not model.is_fitted
 
         model_pos1 = PlackettLuceModel(model_type="position1", epsilon=1e-4)
         assert model_pos1.model_type == "position1"
@@ -39,7 +40,7 @@ class TestPlackettLuceModel:
         model = PlackettLuceModel(model_type="full")
         stats = model.fit(data, verbose=False)
 
-        assert model.is_fitted == True
+        assert model.is_fitted
         assert "iterations" in stats
         assert "time" in stats
         assert stats["iterations"] > 0
@@ -142,7 +143,7 @@ class TestPlackettLuceModel:
         model = PlackettLuceModel(model_type="position1")
         stats = model.fit(data, verbose=False)
 
-        assert model.is_fitted == True
+        assert model.is_fitted
         assert stats["iterations"] > 0
 
         prob = model.predict_probability(("A", "B", "C"))

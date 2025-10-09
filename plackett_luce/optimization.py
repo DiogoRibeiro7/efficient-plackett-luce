@@ -5,7 +5,7 @@ All performance-critical computations using JIT compilation.
 """
 
 import numpy as np
-from numba import jit, prange
+from numba import jit
 
 
 @jit(nopython=True)

@@ -2,9 +2,9 @@
 Tests for projected Plackett-Luce models.
 """
 
-import pytest
 import numpy as np
-from plackett_luce import ProjectedPlackettLuce, PlackettLuceModel
+
+from plackett_luce import PlackettLuceModel, ProjectedPlackettLuce
 from plackett_luce.utils import generate_synthetic_rankings
 
 

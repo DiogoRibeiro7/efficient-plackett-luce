@@ -2,16 +2,16 @@
 Integration tests for end-to-end workflows.
 """
 
-import pytest
 import numpy as np
-from pathlib import Path
+import pytest
+
 from plackett_luce import (
     PlackettLuceModel,
     ProjectedPlackettLuce,
     cross_validate,
-    train_test_split,
     generate_synthetic_rankings,
     ranking_similarity,
+    train_test_split,
 )
 from plackett_luce.validation import stratified_split_by_size, temporal_split
 
@@ -182,9 +182,7 @@ class TestEndToEndWorkflows:
         # 1. Generate temporal data
         rounds = []
         for round_num in range(10):
-            round_data = generate_synthetic_rankings(
-                N=10, M=20, K_min=2, K_max=4, seed=round_num
-            )
+            round_data = generate_synthetic_rankings(N=10, M=20, K_min=2, K_max=4, seed=round_num)
             rounds.extend(round_data)
 
         # 2. Temporal split
@@ -261,6 +259,7 @@ class TestRealWorldScenarios:
         # TeamA should be highly ranked (won the tournament)
         top_team = ranking[0][0]
         assert top_team == "TeamA"
+        assert {node for match, _ in all_results for node in match} == set(teams)
 
     def test_survey_preference_scenario(self):
         """Test survey preference ranking scenario."""
@@ -297,6 +296,10 @@ class TestRealWorldScenarios:
         # Fit model
         model = PlackettLuceModel(model_type="full")
         model.fit(game_results, verbose=False)
+
+        ranking = model.get_ranking()
+        ranked_players = {player for player, _ in ranking}
+        assert ranked_players.issubset(set(players))
 
         # Player1 should be top ranked
         ranking = model.get_ranking()
@@ -384,9 +387,7 @@ class TestComplexPipelines:
         similarities = []
         for i in range(len(rankings_list)):
             for j in range(i + 1, len(rankings_list)):
-                sim = ranking_similarity(
-                    rankings_list[i], rankings_list[j], method="kendall"
-                )
+                sim = ranking_similarity(rankings_list[i], rankings_list[j], method="kendall")
                 similarities.append(sim)
 
         # Rankings should have some similarity
@@ -484,7 +485,7 @@ class TestPerformanceWorkflows:
         data = generate_synthetic_rankings(N=200, M=500, K_min=2, K_max=5, seed=42)
 
         model = PlackettLuceModel(model_type="full")
-        stats = model.fit(data, verbose=False)
+        model.fit(data, verbose=False)
 
         assert len(model.scores) == 200
         assert model.is_fitted
@@ -499,6 +500,7 @@ class TestPerformanceWorkflows:
         for _ in range(3):
             stats = model.fit(data, verbose=False)
             assert model.is_fitted
+            assert stats["iterations"] > 0
 
         # Should produce consistent results
         ranking = model.get_ranking()

@@ -29,6 +29,22 @@ class TestPlackettLuceModel:
         with pytest.raises(ValueError):
             PlackettLuceModel(model_type="invalid")
 
+    def test_preprocess_deterministic_mixed_types(self):
+        """Mixed-type nodes should sort deterministically and without duplicates."""
+
+        model = PlackettLuceModel(model_type="full")
+        hyperedges = [((1, "2", 3.0), 1.0)]
+
+        N, edges, weights, edge_lengths, edge_starts = model._preprocess_edges(hyperedges)
+
+        assert N == 3
+        assert list(model.node_to_idx.keys()) == [1, "2", 3.0]
+        assert list(model.idx_to_node.values()) == [1, "2", 3.0]
+        assert edges.tolist() == [0, 1, 2]
+        assert weights.tolist() == [1.0]
+        assert edge_lengths.tolist() == [3]
+        assert edge_starts.tolist() == [0]
+
     def test_fit_simple_data(self):
         """Test fitting on simple data."""
         data = [
@@ -55,6 +71,22 @@ class TestPlackettLuceModel:
         assert stats["iterations"] < model.max_iterations
         assert model.scores is not None
         assert len(model.scores) == 20
+        assert model.converged is True
+
+    def test_fit_reproducibility_with_seed(self):
+        """Fitting with the same seed should produce identical scores."""
+        data = generate_synthetic_rankings(N=12, M=60, K_min=2, K_max=5, seed=101)
+
+        model1 = PlackettLuceModel(model_type="full", random_state=123, max_iterations=500)
+        stats1 = model1.fit(data, verbose=False)
+
+        model2 = PlackettLuceModel(model_type="full", random_state=123, max_iterations=500)
+        stats2 = model2.fit(data, verbose=False)
+
+        assert np.allclose(model1.scores, model2.scores, atol=1e-8)
+        assert stats1["iterations"] == stats2["iterations"]
+        assert stats1["converged"] == stats2["converged"]
+        assert model1.converged == model2.converged == stats1["converged"]
 
     def test_get_ranking(self):
         """Test getting rankings."""
@@ -221,6 +253,21 @@ class TestPlackettLuceModel:
         model = PlackettLuceModel(model_type="full")
         with pytest.warns(UserWarning, match="Large comparison sizes"):
             model.fit(data, verbose=False)
+
+    def test_fit_max_iterations_warning(self):
+        """Hitting max iterations should warn and mark model as not converged."""
+        data = generate_synthetic_rankings(N=6, M=30, K_min=2, K_max=4, seed=2024)
+
+        model = PlackettLuceModel(
+            model_type="full", epsilon=1e-12, max_iterations=1, random_state=777
+        )
+        with pytest.warns(UserWarning, match="Maximum iterations"):
+            stats = model.fit(data, verbose=False)
+
+        assert stats["converged"] is False
+        assert stats["timed_out"] is False
+        assert stats["iterations"] == model.max_iterations
+        assert model.converged is False
 
     def test_fit_timeout(self, monkeypatch):
         """Timeout should abort fitting and emit warning."""

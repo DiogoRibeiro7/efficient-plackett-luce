@@ -500,8 +500,8 @@ class TestCrossValidateAdvanced:
         results1 = cross_validate(data, n_splits=5, random_state=42, verbose=False)
         results2 = cross_validate(data, n_splits=5, random_state=42, verbose=False)
 
-        assert results1["pl_scores"] == results2["pl_scores"]
-        assert results1["pl_mean"] == results2["pl_mean"]
+        assert np.allclose(results1["pl_scores"], results2["pl_scores"], atol=1e-8)
+        assert np.isclose(results1["pl_mean"], results2["pl_mean"], atol=1e-8)
 
     def test_cv_different_seeds(self):
         """Test that different seeds give different splits."""

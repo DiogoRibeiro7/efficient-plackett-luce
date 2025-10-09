@@ -30,10 +30,10 @@ NodeIndexMap = Dict[Any, int]
 IndexNodeMap = Dict[int, Any]
 
 
-def _safe_sort_key(value: Any) -> Tuple[str, str]:
+def _safe_sort_key(value: Any) -> str:
     """Provide a deterministic sort key for heterogeneous node labels."""
 
-    return (type(value).__name__, repr(value))
+    return str(value)
 
 
 
@@ -91,11 +91,21 @@ class PlackettLuceModel:
         self.use_cache = use_cache
         self._data_hash_cache: Optional[CacheDict] = {} if use_cache else None
         self.random_state = random_state
+        self.converged = False
 
     def _validate_hyperedges(self, hyperedges: List[Tuple]) -> List[Hyperedge]:
         """Normalize and validate hyperedges provided by the caller."""
 
-        return normalize_hyperedges(hyperedges)
+        try:
+            normalized = normalize_hyperedges(hyperedges)
+        except ValueError as exc:
+            raise ValueError(f"Invalid hyperedge structure: {exc}") from exc
+
+        for ranking, weight in normalized:
+            assert isinstance(ranking, tuple)
+            assert isinstance(weight, (int, float))
+
+        return normalized
 
     def _check_data_quality(self, hyperedges: List[Tuple]) -> None:
         """Check data quality and issue warnings for potential problems."""
@@ -156,11 +166,17 @@ class PlackettLuceModel:
     def _preprocess_edges(self, hyperedges: List[Hyperedge]):
         """Convert hyperedges to efficient flattened array format."""
 
-        unique_nodes = set()
+        unique_nodes_map: Dict[str, Any] = {}
         for ranking, _ in hyperedges:
-            unique_nodes.update(ranking)
+            for node in ranking:
+                key = _safe_sort_key(node)
+                if key not in unique_nodes_map:
+                    unique_nodes_map[key] = node
 
-        sorted_nodes = sorted(unique_nodes, key=_safe_sort_key)
+        unique_nodes = sorted(unique_nodes_map.values(), key=_safe_sort_key)
+        assert len(unique_nodes) == len({str(node) for node in unique_nodes})
+
+        sorted_nodes = unique_nodes
         self.node_to_idx = {node: idx for idx, node in enumerate(sorted_nodes)}
         self.idx_to_node = {idx: node for node, idx in self.node_to_idx.items()}
         N = len(sorted_nodes)
@@ -201,6 +217,8 @@ class PlackettLuceModel:
         --------
         dict : Training statistics (iterations, time, final_convergence, converged, timed_out)
         """
+        self.converged = False
+
         if self.use_cache:
             self._data_hash_cache = {}
         else:
@@ -262,10 +280,13 @@ class PlackettLuceModel:
                     print(f"Converged in {iteration + 1} iterations ({elapsed:.4f}s)")
 
                 self.is_fitted = True
+                self.converged = True
                 return {
                     "iterations": iteration + 1,
                     "time": elapsed,
                     "final_convergence": A,
+                    "converged": True,
+                    "timed_out": False,
                 }
 
             if self.timeout is not None:
@@ -283,10 +304,21 @@ class PlackettLuceModel:
                     break
 
         elapsed = time.time() - start_time
-        if verbose:
-            print(f"Warning: Did not converge in {self.max_iterations} iterations")
+        if not timed_out:
+            warnings.warn(
+                (
+                    f"Maximum iterations ({self.max_iterations}) reached without convergence "
+                    f"(A={last_convergence:.8f})."
+                ),
+                UserWarning,
+            )
+            if verbose:
+                print(f"Warning: Did not converge in {self.max_iterations} iterations")
+        elif verbose:
+            print(f"Stopped after timeout at iteration {timeout_iteration}.")
 
         self.is_fitted = True
+        self.converged = False
         iterations_used = timeout_iteration if timed_out else self.max_iterations
         return {
             "iterations": iterations_used,

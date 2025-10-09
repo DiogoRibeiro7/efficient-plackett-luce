@@ -19,6 +19,28 @@ def _python_scalar(value: Union[int, float, np.generic]) -> Union[int, float]:
     return value
 
 
+def _coerce_ranking_tuple(ranking: Any) -> Tuple[Any, ...]:
+    """Convert assorted ranking structures into a tuple-only representation."""
+
+    current = ranking
+    # Unwrap redundant single-item containers, e.g. [[[1, 2, 3]]]
+    while isinstance(current, (list, tuple)) and len(current) == 1 and isinstance(
+        current[0], (list, tuple)
+    ):
+        current = current[0]
+
+    if isinstance(current, (list, tuple)):
+        coerced = tuple(
+            _coerce_ranking_tuple(item) if isinstance(item, (list, tuple)) else item
+            for item in current
+        )
+    else:
+        coerced = (current,)
+
+    assert isinstance(coerced, tuple)
+    return coerced
+
+
 def normalize_hyperedges(hyperedges: Iterable[Any]) -> List[Hyperedge]:
     """Normalize hyperedge structures to canonical ``(ranking, weight)`` pairs."""
 
@@ -42,10 +64,8 @@ def normalize_hyperedges(hyperedges: Iterable[Any]) -> List[Hyperedge]:
 
         ranking_raw, weight_raw = current
 
-        if isinstance(ranking_raw, (list, tuple)):
-            ranking_tuple = tuple(ranking_raw)
-        else:
-            ranking_tuple = (ranking_raw,)
+        ranking_tuple = _coerce_ranking_tuple(ranking_raw)
+        assert isinstance(ranking_tuple, tuple)
 
         if len(ranking_tuple) < 2:
             raise ValueError(f"Ranking must contain at least two entities at index {idx}")
@@ -80,7 +100,7 @@ def generate_synthetic_rankings(
     K_min: int = 2,
     K_max: int = 10,
     seed: Union[int, None] = None,
-) -> List[Tuple[Tuple[int, ...], int]]:
+) -> List[Tuple[Tuple[int, ...], float]]:
     """Generate synthetic rankings according to the Plackett-Luce model."""
 
     for name, value in {"N": N, "M": M, "K_min": K_min, "K_max": K_max}.items():
@@ -122,7 +142,7 @@ def generate_synthetic_rankings(
     true_scores = u / (1 - u)
     true_scores /= np.exp(np.mean(np.log(true_scores)))
 
-    hyperedges: List[Tuple[Tuple[int, ...], int]] = []
+    hyperedges: List[Tuple[Tuple[int, ...], float]] = []
     for _ in range(M):
         K = int(rng.integers(K_min, K_max + 1))
         nodes = rng.choice(N, size=K, replace=False)
@@ -131,7 +151,10 @@ def generate_synthetic_rankings(
         node_scores.sort(key=lambda x: x[1], reverse=True)
         ranking = tuple(node for node, _ in node_scores)
 
-        hyperedges.append((ranking, 1))
+        hyperedge = (ranking, float(1))
+        assert isinstance(hyperedge[0], tuple)
+        assert isinstance(hyperedge[1], float)
+        hyperedges.append(hyperedge)
 
     return hyperedges
 

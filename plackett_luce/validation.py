@@ -21,19 +21,6 @@ def _create_rng(
 ) -> np.random.Generator:
     """Create a NumPy Generator deterministic by default."""
 
-
-def _rng_seed(
-    random_state: Optional[Union[int, np.random.Generator, np.random.RandomState]],
-) -> int:
-    """Derive an integer seed from assorted random_state inputs."""
-
-    if isinstance(random_state, np.random.Generator):
-        return int(random_state.integers(0, 2**32 - 1))
-    if isinstance(random_state, np.random.RandomState):
-        return int(random_state.randint(0, 2**32 - 1))
-    if isinstance(random_state, (np.integer, int)):
-        return int(random_state)
-    return _DEFAULT_SEED
     if isinstance(random_state, np.random.Generator):
         return random_state
     if isinstance(random_state, np.random.RandomState):
@@ -46,6 +33,22 @@ def _rng_seed(
     raise TypeError(f"Unsupported random_state type: {type(random_state).__name__}")
 
 
+def _rng_seed(
+    random_state: Optional[Union[int, np.random.Generator, np.random.RandomState]],
+) -> int:
+    """Derive an integer seed from assorted random_state inputs."""
+
+    if isinstance(random_state, np.random.Generator):
+        return int(random_state.integers(0, 2**32 - 1))
+    if isinstance(random_state, np.random.RandomState):
+        return int(random_state.randint(0, 2**32 - 1))
+    if isinstance(random_state, (np.integer, int)):
+        return int(random_state)
+    if random_state is None:
+        return _DEFAULT_SEED
+    raise TypeError(f"Unsupported random_state type: {type(random_state).__name__}")
+
+
 def train_test_split(
     hyperedges: List[Tuple[Tuple, Union[int, float]]],
     test_size: float = 0.2,
@@ -55,6 +58,8 @@ def train_test_split(
     """Split ranking data into deterministic train and test subsets."""
 
     data = normalize_hyperedges(hyperedges)
+    assert all(isinstance(edge, tuple) for edge in data)
+    assert all(isinstance(edge[0], tuple) for edge in data)
 
     if not 0.0 < test_size < 1.0:
         raise ValueError(f"test_size must be between 0.0 and 1.0 (exclusive), got {test_size}")
@@ -74,18 +79,35 @@ def train_test_split(
     if shuffle:
         indices = rng.permutation(indices)
 
-    n_test = int(round(n_samples * test_size))
+    desired_test = int(n_samples * test_size)
+    n_test = desired_test
     if n_test <= 0:
         n_test = 1
     elif n_test >= n_samples:
         n_test = n_samples - 1
+
     n_train = n_samples - n_test
 
     train_indices = indices[:n_train]
     test_indices = indices[n_train : n_train + n_test]
 
-    train = [data[int(i)] for i in np.sort(train_indices)]
-    test = [data[int(i)] for i in np.sort(test_indices)]
+    train: List[Hyperedge] = [
+        cast(Hyperedge, tuple(data[int(i)])) for i in np.sort(train_indices)
+    ]
+    test: List[Hyperedge] = [
+        cast(Hyperedge, tuple(data[int(i)])) for i in np.sort(test_indices)
+    ]
+
+    assert all(isinstance(edge, tuple) and isinstance(edge[0], tuple) for edge in train)
+    assert all(isinstance(edge, tuple) and isinstance(edge[0], tuple) for edge in test)
+    assert len(train) + len(test) == n_samples
+    train_index_set = {int(i) for i in train_indices}
+    test_index_set = {int(i) for i in test_indices}
+    assert train_index_set.isdisjoint(test_index_set)
+    assert len(train_index_set | test_index_set) == n_samples
+    if 0 < desired_test < n_samples:
+        assert n_test == desired_test
+    assert len(test) == n_test
 
     return train, test
 
@@ -166,7 +188,8 @@ def temporal_split(
     if n_samples == 1:
         return ([], data.copy()) if test_size >= 0.5 else (data.copy(), [])
 
-    n_test = int(round(n_samples * test_size))
+    desired_test = int(n_samples * test_size)
+    n_test = desired_test
     if n_test <= 0:
         n_test = 1
     elif n_test >= n_samples:
@@ -176,6 +199,9 @@ def temporal_split(
 
     train_data = data[:n_train]
     test_data = data[n_train : n_train + n_test]
+
+    if 0 < desired_test < n_samples:
+        assert n_test == desired_test
 
     return train_data, test_data
 
@@ -197,6 +223,7 @@ def cross_validate(
 
     data = normalize_hyperedges(hyperedges)
     dataset_size = len(data)
+    assert all(isinstance(edge, tuple) and isinstance(edge[0], tuple) for edge in data)
     if dataset_size == 0:
         raise ValueError("hyperedges cannot be empty")
 
@@ -207,6 +234,7 @@ def cross_validate(
 
     kf_seed = _rng_seed(random_state)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=kf_seed)
+    fold_rng = np.random.default_rng(kf_seed)
 
     scores_pl: List[float] = []
     scores_projected: Optional[List[float]] = [] if compare_projected else None
@@ -237,10 +265,20 @@ def cross_validate(
         elif verbose:
             print(f"Fold {fold_index + 1}/{n_splits}...")
 
-        train_data = [data[int(i)] for i in train_idx]
-        test_data = [data[int(i)] for i in test_idx]
+        train_idx_sorted = np.sort(train_idx)
+        test_idx_sorted = np.sort(test_idx)
 
-        fold_seed = kf_seed + fold_index
+        train_data: List[Hyperedge] = [
+            cast(Hyperedge, tuple(data[int(i)])) for i in train_idx_sorted
+        ]
+        test_data: List[Hyperedge] = [
+            cast(Hyperedge, tuple(data[int(i)])) for i in test_idx_sorted
+        ]
+
+        assert all(isinstance(edge, tuple) and isinstance(edge[0], tuple) for edge in train_data)
+        assert all(isinstance(edge, tuple) and isinstance(edge[0], tuple) for edge in test_data)
+
+        fold_seed = int(fold_rng.integers(0, 2**32 - 1))
 
         model_pl = PlackettLuceModel(model_type=model_type, random_state=fold_seed)
         model_pl.fit(train_data, verbose=False)

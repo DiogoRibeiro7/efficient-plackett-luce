@@ -202,6 +202,24 @@ class PlackettLuceModel:
 
         return N, edges_flat, weights, edge_lengths, edge_starts
 
+    def _compute_fallback_scores(self, hyperedges: List[Hyperedge]) -> np.ndarray:
+        """Compute deterministic fallback scores using Borda-like counting."""
+
+        if not self.node_to_idx:
+            return np.ones(0, dtype=float)
+
+        fallback = np.zeros(len(self.node_to_idx), dtype=float)
+        for ranking, weight in hyperedges:
+            size = len(ranking)
+            for position, node in enumerate(ranking):
+                idx = self.node_to_idx[node]
+                fallback[idx] += float(weight) * (size - position - 1)
+
+        # Ensure strictly positive scores
+        fallback += 1e-12
+        fallback = normalize_scores(fallback)
+        return fallback
+
     def fit(self, hyperedges: List[Tuple], verbose: bool = False) -> Dict:
         """
         Fit the model using Newman's efficient algorithm.
@@ -320,6 +338,10 @@ class PlackettLuceModel:
         self.is_fitted = True
         self.converged = False
         iterations_used = timeout_iteration if timed_out else self.max_iterations
+        fallback_scores = self._compute_fallback_scores(normalized_hyperedges)
+        if fallback_scores.size:
+            self.scores = fallback_scores
+
         return {
             "iterations": iterations_used,
             "time": elapsed,

@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Diogo Ribeiro", email = "dfr@esmad.ipp.pt"}
 ]
 maintainers = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Diogo Ribeiro", email = "dfr@esmad.ipp.pt"}
 ]
 keywords = [
     "ranking", 
@@ -32,7 +32,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -62,11 +61,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/efficient-plackett-luce"
+Homepage = "https://github.com/diogoribeiro7/efficient-plackett-luce"
 Documentation = "https://efficient-plackett-luce.readthedocs.io"
-Repository = "https://github.com/yourusername/efficient-plackett-luce"
-"Bug Tracker" = "https://github.com/yourusername/efficient-plackett-luce/issues"
-Changelog = "https://github.com/yourusername/efficient-plackett-luce/blob/main/CHANGELOG.md"
+Repository = "https://github.com/diogoribeiro7/efficient-plackett-luce"
+"Bug Tracker" = "https://github.com/diogoribeiro7/efficient-plackett-luce/issues"
 
 [tool.black]
 line-length = 100
@@ -91,7 +89,7 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

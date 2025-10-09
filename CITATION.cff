@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Efficient Plackett-Luce"
+version: 0.1.0
+date-released: 2025-01-15
+url: "https://github.com/diogoribeiro7/efficient-plackett-luce"
+repository-code: "https://github.com/diogoribeiro7/efficient-plackett-luce"
+license: MIT
+authors:
+  - family-names: "Ribeiro"
+    given-names: "Diogo"
+    email: "dfr@esmad.ipp.pt"
+    orcid: "https://orcid.org/0009-0001-2022-7072"
+preferred-citation:
+  type: article
+  title: "Efficient inference of rankings from multi-body comparisons"
+  authors:
+    - family-names: "Yeung"
+      given-names: "Jack"
+    - family-names: "Kaiser"
+      given-names: "Daniel"
+    - family-names: "Radicchi"
+      given-names: "Filippo"
+  journal: "arXiv preprint"
+  year: 2025
+  url: "https://arxiv.org/abs/2501.16565"

@@ -1,0 +1,26 @@
+name: Question
+description: Ask a question or request clarification
+title: "[QUESTION] "
+labels:
+  - question
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: Ask your question here...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any background information that helps clarify your question.
+      placeholder: Relevant background details...
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Details
+      description: Add screenshots, logs, or extra information if helpful.
+      placeholder: Additional information...

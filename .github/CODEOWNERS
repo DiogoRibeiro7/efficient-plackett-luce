@@ -1,0 +1,19 @@
+# Code owners for automatic review requests
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @diogoribeiro7
+
+# Core algorithm files
+/plackett_luce/core.py @diogoribeiro7
+/plackett_luce/optimization.py @diogoribeiro7
+
+# Documentation
+/docs/ @diogoribeiro7
+*.md @diogoribeiro7
+
+# CI/CD and workflows
+/.github/ @diogoribeiro7
+
+# Tests
+/tests/ @diogoribeiro7

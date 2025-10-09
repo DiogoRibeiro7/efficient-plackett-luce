@@ -1,0 +1,31 @@
+name: Code Quality
+
+on: [push, pull_request]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install black isort flake8 mypy pylint
+
+      - name: Check formatting
+        run: |
+          black --check plackett_luce/ tests/
+          isort --check-only plackett_luce/ tests/
+
+      - name: Lint
+        run: flake8 plackett_luce/ tests/
+
+      - name: Type check
+        run: mypy plackett_luce/
+        continue-on-error: true

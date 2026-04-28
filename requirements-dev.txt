@@ -6,7 +6,7 @@ flake8>=4.0.0
 mypy>=0.950
 isort>=5.10.0
 tqdm>=4.60.0
-twine>=4.0.0
+twine>=6.2.0
 
 # Documentation
 sphinx>=4.5.0
